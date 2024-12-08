@@ -51,6 +51,7 @@ jobs:
 
       - name: Commit changes
         run: |
+          git add .
           git commit -m "[bod] make new changes"
           git push    
 
