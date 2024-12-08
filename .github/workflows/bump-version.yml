@@ -73,12 +73,25 @@ jobs:
           git push origin ${{ env.branch_name }}
           
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ env.branch_name }}
-          base: main
-          title: "Update index.js dynamically"
-          body: |
-            This PR updates the `index.js` file dynamically with the timestamp
+      - name: Create Pull Request via curl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "title": "Update index.js dynamically",
+              "body": "This PR updates the `index.js` file dynamically with new changes.",
+              "head": "'"${{ env.branch_name }}"'",
+              "base": "main"
+            }' \
+            https://api.github.com/repos/${{ github.repository }}/pulls)
+          
+          PR_URL=$(echo $PR_RESPONSE | jq -r '.html_url')
+          if [ "$PR_URL" = "null" ]; then
+            echo "Failed to create PR. Response: $PR_RESPONSE"
+            exit 1
+          else
+            echo "Pull Request created: $PR_URL"
+          fi
