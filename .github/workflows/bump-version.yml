@@ -1,0 +1,73 @@
+name: Bump Version and Commit
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: "Select version type to bump (default: patch)"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+
+permissions:
+  contents: write
+
+jobs:
+  bump_version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check if running from main
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "This workflow can only be run from the main branch."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Create a new branch
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          BRANCH_NAME="bump-version-$(date +'%Y-%m-%d-%H-%M-%S')"
+          git checkout -b $BRANCH_NAME
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV    
+
+      - name: Make changes
+        run: |
+          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S')
+          echo "// Updated this file on $TIMESTAMP" >> index.js
+          cat index.js   
+
+      - name: Commit changes
+        run: |
+          git commit -m "[bod] make new changes"
+          git push    
+
+      - name: Bump version
+        id: updateVersion
+        run: |
+          VERSION_TYPE=${{ github.event.inputs.version_type }}
+          echo "Bumping version type: $VERSION_TYPE"
+          
+          NEW_VERSION=$(npm version $VERSION_TYPE)
+          echo "New version: $NEW_VERSION"
+          git tag -d "v$NEW_VERSION"
+
+      - name: Push the new branch
+        id: pushBranch
+        if: ${{ steps.updateVersion.outcome == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin ${{ env.branch_name }}
